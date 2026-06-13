@@ -10,6 +10,7 @@ import {
   type ModelId,
   type Region,
   type Scenario,
+  type WaterScope,
 } from "../lib/engine";
 
 export const Route = createFileRoute("/")({
