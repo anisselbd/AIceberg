@@ -88,7 +88,7 @@ function asFraction(value: number): number {
 }
 
 export const estimateScenario = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ description: z.string().min(3).max(2000) }))
+  .validator(z.object({ description: z.string().min(3).max(2000) }))
   .handler(async ({ data }) => {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {

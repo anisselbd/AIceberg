@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowDown, Check, Download, Leaf, Minus } from "lucide-react";
+import { AlertTriangle, ArrowDown, Check, Download, Leaf, Minus, Shield, Sparkles } from "lucide-react";
 import {
   CartesianGrid,
   Legend,
@@ -18,6 +18,7 @@ import {
   MODEL_FACTORS,
   PRESETS,
   breakEvenCurve,
+  compareDeployments,
   evaluate,
   rankModels,
   type ModelId,
@@ -25,6 +26,7 @@ import {
   type Scenario,
   type WaterScope,
 } from "../lib/engine";
+import { estimateScenario } from "../lib/api/estimate.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -78,13 +80,47 @@ const num = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
 function Index() {
   const [scenario, setScenario] = useState(DEFAULTS);
   const [isExporting, setIsExporting] = useState(false);
+  const [description, setDescription] = useState("");
+  const [estimating, setEstimating] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [estimateMeta, setEstimateMeta] = useState<{
+    assumptions: string[];
+    confidence: string;
+    costEur: number;
+    model: string;
+  } | null>(null);
   const verdictRef = useRef<HTMLDivElement>(null);
   const result = useMemo(() => evaluate(scenario), [scenario]);
   const curve = useMemo(() => breakEvenCurve(scenario), [scenario]);
   const ranking = useMemo(() => rankModels(scenario), [scenario]);
+  const deployments = useMemo(() => compareDeployments(scenario), [scenario]);
   const setNum = (key: keyof Scenario, value: string) =>
     setScenario((s) => ({ ...s, [key]: Number(value) || 0 }));
   const maxCost = Math.max(result.humanMonthlyCost, result.aiMonthlyCost, 1);
+
+  const runEstimate = async () => {
+    if (!description.trim() || estimating) return;
+    setEstimating(true);
+    setEstimateError(null);
+    try {
+      const res = await estimateScenario({ data: { description } });
+      if (res.ok) {
+        setScenario(res.scenario as Scenario);
+        setEstimateMeta({
+          assumptions: res.assumptions,
+          confidence: res.confidence,
+          costEur: res.estimationCostEur,
+          model: res.model,
+        });
+      } else {
+        setEstimateError(res.error);
+      }
+    } catch {
+      setEstimateError("Erreur réseau, réessaie.");
+    } finally {
+      setEstimating(false);
+    }
+  };
   const exportVerdict = async () => {
     const node = verdictRef.current;
     if (!node || isExporting) return;
@@ -134,7 +170,55 @@ function Index() {
             title="Le process à évaluer"
             sub="Paramètres économiques et opérationnels"
           />
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 rounded-sm border border-primary/30 bg-positive-soft/40 p-3">
+            <label className="mb-1.5 block text-[11px] font-medium text-primary">
+              Décrivez votre besoin, l'IA estime le scénario
+            </label>
+            <textarea
+              className="field min-h-[64px] w-full resize-none"
+              placeholder="Ex : trier les emails entrants de l'entreprise par importance et par sujet"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                size="sm"
+                className="rounded-sm"
+                onClick={runEstimate}
+                disabled={estimating || !description.trim()}
+              >
+                <Sparkles />
+                {estimating ? "Estimation en cours…" : "Estimer avec l'IA"}
+              </Button>
+              {estimateMeta && (
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  Estimé par {estimateMeta.model} · {eurFine.format(estimateMeta.costEur)} · confiance{" "}
+                  {estimateMeta.confidence}
+                </span>
+              )}
+            </div>
+            {estimateError && <p className="mt-2 text-[11px] text-negative">{estimateError}</p>}
+            {estimateMeta && estimateMeta.assumptions.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Hypothèses retenues
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {estimateMeta.assumptions.map((a, i) => (
+                    <li key={i} className="flex gap-2 text-[11px] text-muted-foreground">
+                      <span className="text-primary">·</span>
+                      {a}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <p className="mt-4 text-[10px] text-muted-foreground">
+            Ou partez d'un exemple, ou remplissez à la main :
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
             {Object.entries(PRESETS).map(([key, preset]) => (
               <button
                 key={key}
@@ -398,7 +482,7 @@ function Index() {
                 <Break
                   label="Tokens API"
                   value={result.costPerTask.apiTokens}
-                  source="tarifs officiels · placeholder"
+                  source="tarifs officiels USD convertis en EUR"
                   color="bg-positive"
                 />
                 <Break
@@ -468,6 +552,61 @@ function Index() {
               </span>
             </div>
           </div>
+          <div className="mt-6 border-t border-border pt-5">
+            <div className="flex items-center gap-2">
+              <Shield className="size-4 text-primary" />
+              <h3 className="text-sm font-medium">Cloud ou souverain ?</h3>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Si vous automatisez, comment déployer le modèle
+            </p>
+            <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-border bg-border">
+              <DeployCard
+                label="Humain seul"
+                value={deployments.human.monthly}
+                active={deployments.cheapest === "human"}
+              />
+              <DeployCard
+                label="IA cloud (API)"
+                value={deployments.cloud.monthly}
+                active={deployments.cheapest === "cloud"}
+              />
+              <DeployCard
+                label="IA locale souveraine"
+                value={deployments.local.monthly}
+                active={deployments.cheapest === "local"}
+                badge="Vos données restent chez vous"
+              />
+            </div>
+            <div className="mt-3 rounded-sm border border-border bg-panel px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+              {deployments.sovereigntyPremiumMonthly > 0 ? (
+                <>
+                  La souveraineté coûte{" "}
+                  <span className="font-mono text-foreground">
+                    {eur.format(deployments.sovereigntyPremiumMonthly)}/mois
+                  </span>{" "}
+                  de plus que le cloud ({pct(deployments.sovereigntyPremiumRate)}). On chiffre le prix
+                  de la confidentialité, à vous d'arbitrer.
+                </>
+              ) : (
+                <>
+                  À ce volume, le souverain est{" "}
+                  <span className="font-mono text-positive">même moins cher</span> que le cloud.
+                </>
+              )}
+              {deployments.localBreakEvenVsCloudVolume !== null &&
+                deployments.localBreakEvenVsCloudVolume > 0 && (
+                  <>
+                    {" "}
+                    Le local devient plus avantageux dès{" "}
+                    <span className="font-mono text-foreground">
+                      {num.format(deployments.localBreakEvenVsCloudVolume)} tâches/mois
+                    </span>
+                    .
+                  </>
+                )}
+            </div>
+          </div>
         </section>
       </div>
 
@@ -523,7 +662,7 @@ function Index() {
             </table>
           </div>
           <p className="mt-3 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-            Simulation indicative · tarifs et facteurs en placeholder
+            Tarifs officiels mi-2026 · énergie arXiv 2505.09598 · à revalider le jour J
           </p>
         </div>
       </section>
@@ -733,6 +872,32 @@ function Foot({
       <p className="font-mono text-sm sm:text-base">{value}</p>
       <p className="mt-1 text-[10px] text-muted-foreground">{label}</p>
       <p className="mt-1 text-[8px] text-muted-foreground/70">{source}</p>
+    </div>
+  );
+}
+function DeployCard({
+  label,
+  value,
+  active,
+  badge,
+}: {
+  label: string;
+  value: number;
+  active?: boolean;
+  badge?: string;
+}) {
+  return (
+    <div className={`bg-panel p-4 ${active ? "ring-1 ring-inset ring-primary" : ""}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        {active && (
+          <span className="shrink-0 rounded-sm bg-positive-soft px-1.5 py-0.5 text-[9px] uppercase text-positive">
+            Moins cher
+          </span>
+        )}
+      </div>
+      <p className="mt-2 font-mono text-lg">{eur.format(value)}</p>
+      {badge && <p className="mt-2 text-[9px] leading-tight text-primary">{badge}</p>}
     </div>
   );
 }
