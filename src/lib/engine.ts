@@ -254,8 +254,17 @@ export function evaluate(scenario: Scenario): EvaluationResult {
   let explanation = "Le coût complet de l’IA dépasse encore celui du traitement humain.";
   if (monthlySavings > 0 && (reviewRate >= 0.55 || errorRate > 0.03 || savingsRate < 0.2)) {
     recommendation = "HYBRIDE";
-    explanation =
-      "Le gain existe, mais la supervision humaine reste structurante dans l’économie du process.";
+    // L'explication colle au facteur réellement en cause, pas à un message générique.
+    const pctFr = (x: number) =>
+      x.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+    if (reviewRate >= 0.55) {
+      explanation = `Rentable, mais ${pctFr(reviewRate * 100)} % des sorties passent par une relecture humaine : la supervision pèse encore lourd dans l’économie du process.`;
+    } else if (errorRate > 0.03) {
+      explanation = `Rentable, mais le risque d’erreur résiduel (${pctFr(errorRate * 100)} %) reste trop élevé pour une automatisation totale : on route les cas sensibles vers un humain.`;
+    } else {
+      explanation =
+        "Rentable, mais le gain net est mince : l’automatisation se défend, sans réelle marge de sécurité.";
+    }
   } else if (monthlySavings > 0) {
     recommendation = "AUTOMATISER";
     explanation =

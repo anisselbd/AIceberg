@@ -422,32 +422,47 @@ function Index() {
               />
             </div>
             <div className={`mt-3 px-4 py-3 text-[13px] leading-relaxed text-slate-600 ${CARD}`}>
-              {deployments.sovereigntyPremiumMonthly > 0 ? (
-                <>
-                  La souveraineté coûte{" "}
-                  <span className="font-semibold text-slate-900">
-                    {eur.format(deployments.sovereigntyPremiumMonthly)}/mois
-                  </span>{" "}
-                  de plus que le cloud ({pct(deployments.sovereigntyPremiumRate)}). On chiffre le prix
-                  de la confidentialité, à vous d’arbitrer.
-                </>
-              ) : (
-                <>
-                  À ce volume, le souverain est{" "}
-                  <span className="font-semibold text-emerald-600">même moins cher</span> que le cloud.
-                </>
-              )}
-              {deployments.localBreakEvenVsCloudVolume !== null &&
-                deployments.localBreakEvenVsCloudVolume > 0 && (
+              {(() => {
+                const be = deployments.localBreakEvenVsCloudVolume;
+                // Un seuil de bascule au-delà de 10x le volume (ou 100k tâches) n'a aucun
+                // sens opérationnel : les tokens sont si bon marché que le cloud reste
+                // imbattable sur le prix. On en fait un argument souveraineté.
+                const localUnrealistic =
+                  be === null || be > Math.max(scenario.monthlyVolume * 10, 100_000);
+                if (deployments.sovereigntyPremiumMonthly <= 0) {
+                  return (
+                    <>
+                      À ce volume, le souverain est{" "}
+                      <span className="font-semibold text-emerald-600">même moins cher</span> que le
+                      cloud : vos données restent chez vous sans surcoût.
+                    </>
+                  );
+                }
+                return (
                   <>
-                    {" "}
-                    Le local devient plus avantageux dès{" "}
+                    La souveraineté coûte{" "}
                     <span className="font-semibold text-slate-900">
-                      {num.format(deployments.localBreakEvenVsCloudVolume)} tâches/mois
-                    </span>
-                    .
+                      {eur.format(deployments.sovereigntyPremiumMonthly)}/mois
+                    </span>{" "}
+                    de plus que le cloud ({pct(deployments.sovereigntyPremiumRate)}).{" "}
+                    {localUnrealistic ? (
+                      <>
+                        Ici les tokens sont si bon marché que le cloud reste imbattable sur le prix :
+                        le local se justifie par la souveraineté de vos données, pas par le coût.
+                      </>
+                    ) : (
+                      <>
+                        On chiffre le prix de la confidentialité, à vous d’arbitrer. Le local devient
+                        plus avantageux dès{" "}
+                        <span className="font-semibold text-slate-900">
+                          {num.format(be ?? 0)} tâches/mois
+                        </span>
+                        .
+                      </>
+                    )}
                   </>
-                )}
+                );
+              })()}
             </div>
           </Section>
 
@@ -909,8 +924,9 @@ function HeaderBar({ light, onReset }: { light?: boolean; onReset: () => void })
       <div className="mx-auto flex max-w-6xl items-center justify-between">
         <button type="button" onClick={onReset} className="flex items-center gap-2 text-left">
           <img src="/logo-aiceberg.png" alt="AIceberg" className="size-9" />
-          <span className={`text-lg font-semibold tracking-tight ${light ? "text-white" : "text-slate-900"}`}>
-            <span className={light ? "text-sky-300" : "text-indigo-600"}>AI</span>ceberg
+          <span className={`text-lg tracking-tight ${light ? "text-white" : "text-slate-900"}`}>
+            <span className={`font-extrabold ${light ? "text-sky-300" : "text-indigo-600"}`}>AI</span>
+            <span className="font-semibold">ceberg</span>
           </span>
         </button>
         <div className="flex items-center gap-1.5 sm:gap-2.5">
