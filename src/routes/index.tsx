@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowDown, Check, Leaf, Minus } from "lucide-react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, ArrowDown, Check, Download, Leaf, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   MODEL_FACTORS,
   PRESETS,
@@ -61,11 +62,35 @@ const num = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
 
 function Index() {
   const [scenario, setScenario] = useState(DEFAULTS);
+  const [isExporting, setIsExporting] = useState(false);
+  const verdictRef = useRef<HTMLDivElement>(null);
   const result = useMemo(() => evaluate(scenario), [scenario]);
   const ranking = useMemo(() => rankModels(scenario), [scenario]);
   const setNum = (key: keyof Scenario, value: string) =>
     setScenario((s) => ({ ...s, [key]: Number(value) || 0 }));
   const maxCost = Math.max(result.humanMonthlyCost, result.aiMonthlyCost, 1);
+  const exportVerdict = async () => {
+    const node = verdictRef.current;
+    if (!node || isExporting) return;
+
+    setIsExporting(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 2 });
+      const link = document.createElement("a");
+      const taskSlug = scenario.taskName
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .toLowerCase();
+      link.download = `verdict-bascule-${taskSlug || "scenario"}.png`;
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -204,12 +229,25 @@ function Index() {
         </section>
 
         <section className="px-4 py-8 sm:px-7 lg:px-10">
-          <Title
-            index="02"
-            title="Le verdict"
-            sub={`Pour « ${scenario.taskName || "cette tâche"} »`}
-          />
-          <Verdict result={result} />
+          <div ref={verdictRef} className="bg-background">
+            <Title
+              index="02"
+              title="Le verdict"
+              sub={`Pour « ${scenario.taskName || "cette tâche"} »`}
+            />
+            <Verdict result={result} />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3 rounded-sm"
+            onClick={exportVerdict}
+            disabled={isExporting}
+          >
+            <Download />
+            {isExporting ? "Export en cours…" : "Exporter le verdict en image"}
+          </Button>
           <div className="mt-6 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-2">
             <CostBar label="Humain seul" value={result.humanMonthlyCost} max={maxCost} />
             <CostBar label="IA tout compris" value={result.aiMonthlyCost} max={maxCost} positive />
