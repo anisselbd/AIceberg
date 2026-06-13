@@ -913,11 +913,26 @@ function HeaderBar({ light, onReset }: { light?: boolean; onReset: () => void })
             <span className={light ? "text-sky-300" : "text-indigo-600"}>AI</span>ceberg
           </span>
         </button>
-        <span
-          className={`hidden items-center gap-2 text-[11px] sm:flex ${light ? "text-white/70" : "text-slate-400"}`}
-        >
-          <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" /> Calcul en temps réel
-        </span>
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
+          <button
+            type="button"
+            className={`rounded-full px-3.5 py-2 text-xs font-medium transition-colors sm:text-sm ${
+              light ? "text-white/85 hover:text-white" : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Connexion
+          </button>
+          <button
+            type="button"
+            className={`rounded-full px-4 py-2 text-xs font-medium shadow-lg transition-all hover:scale-[1.03] sm:text-sm ${
+              light
+                ? "bg-white text-slate-900 shadow-black/20 hover:bg-white/90"
+                : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-indigo-500/30"
+            }`}
+          >
+            Inscription
+          </button>
+        </div>
       </div>
     </header>
   );
