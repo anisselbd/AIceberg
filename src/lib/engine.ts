@@ -106,6 +106,28 @@ export const PRESETS: Record<string, Scenario> = {
     region: "france",
     waterScope: "on-site",
   },
+  // Le cas qui vend la voie souveraine : gros volume de longs dossiers CONFIDENTIELS.
+  // Beaucoup de tokens d'entrée (40 pages) x volume élevé => le coût API cloud grimpe assez
+  // pour que l'infra locale amortie devienne MOINS chère que le cloud. Verdict AUTOMATISER,
+  // et le local l'emporte : "vos données restent chez vous, sans surcoût".
+  "dossiers-confidentiels": {
+    taskName: "Analyser un dossier juridique confidentiel",
+    monthlyVolume: 2000,
+    humanMinutesPerTask: 35,
+    loadedHourlyCostEur: 75,
+    model: "claude-opus-4-8",
+    inputTokensPerTask: 38000,
+    outputTokensPerTask: 2500,
+    humanReviewRate: 0.5,
+    reviewMinutes: 6,
+    residualErrorRate: 0.02,
+    errorCostEur: 120,
+    setupCostEur: 6000,
+    amortizationMonths: 12,
+    monthlySubscriptionEur: 90,
+    region: "france",
+    waterScope: "on-site",
+  },
 };
 
 export interface CostBreakdownPerTask {
