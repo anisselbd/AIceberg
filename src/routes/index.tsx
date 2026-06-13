@@ -184,10 +184,8 @@ function Index() {
       <div className="relative z-10">
         <header className="px-5 py-5 sm:px-8">
           <div className="mx-auto flex max-w-6xl items-center justify-between">
-            <button type="button" onClick={reset} className="flex items-center gap-2.5 text-left">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/25">
-                <Sparkles className="size-4" />
-              </span>
+            <button type="button" onClick={reset} className="flex items-center gap-2 text-left">
+              <img src="/logo-aiceberg.png" alt="AIceberg" className="size-10" />
               <span className="text-lg font-semibold tracking-tight">AIceberg</span>
             </button>
             <span className="hidden items-center gap-2 text-[11px] text-slate-400 sm:flex">
@@ -199,6 +197,12 @@ function Index() {
         {!analyzed ? (
           <section className="flex min-h-[calc(100vh-78px)] flex-col items-center justify-center px-4 py-12 text-center">
             <div className="w-full max-w-2xl animate-in fade-in slide-in-from-bottom-6 duration-700">
+              <img
+                src="/logo-aiceberg.png"
+                alt="AIceberg"
+                className="mx-auto mb-6 size-28"
+                style={{ animation: "floaty 6s ease-in-out infinite" }}
+              />
               <span className="inline-block rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-500 shadow-sm">
                 Automatiser, oui. Mais à quel prix ?
               </span>
