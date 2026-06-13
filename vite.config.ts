@@ -12,4 +12,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Force Nitro avec la cible Vercel (server functions incluses). Hors contexte Lovable,
+  // cet override s'applique : le build produit .vercel/output (Build Output API v3),
+  // que Vercel sert automatiquement. La clé ANTHROPIC_API_KEY se met côté Vercel.
+  nitro: { preset: "vercel" },
 });
