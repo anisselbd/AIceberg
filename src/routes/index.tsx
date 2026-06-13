@@ -6,7 +6,6 @@ import {
   Check,
   ChevronDown,
   Download,
-  Gauge,
   Layers,
   Leaf,
   Minus,
@@ -32,7 +31,6 @@ import {
   compareDeployments,
   evaluate,
   evaluatePortfolio,
-  rankBySobriety,
   rankModels,
   type ModelId,
   type PortfolioResult,
@@ -99,6 +97,7 @@ function Index() {
   const [analyzed, setAnalyzed] = useState(false);
   const [portfolio, setPortfolio] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [modelSort, setModelSort] = useState<"cost" | "energy">("cost");
   const [isExporting, setIsExporting] = useState(false);
   const [description, setDescription] = useState("");
   const [estimating, setEstimating] = useState(false);
@@ -114,11 +113,29 @@ function Index() {
   const curve = useMemo(() => breakEvenCurve(scenario), [scenario]);
   const ranking = useMemo(() => rankModels(scenario), [scenario]);
   const deployments = useMemo(() => compareDeployments(scenario), [scenario]);
-  const sobriety = useMemo(() => rankBySobriety(scenario), [scenario]);
   const portfolioData = useMemo(() => evaluatePortfolio(Object.values(PRESETS)), []);
+  const sortedModels = useMemo(() => {
+    const rows = [...ranking];
+    return modelSort === "energy"
+      ? rows.sort((a, b) => a.footprint.energyWh - b.footprint.energyWh)
+      : rows.sort((a, b) => a.aiMonthlyCost - b.aiMonthlyCost);
+  }, [ranking, modelSort]);
   const setNum = (key: keyof Scenario, value: string) =>
     setScenario((s) => ({ ...s, [key]: Number(value) || 0 }));
-  const maxCost = Math.max(result.humanMonthlyCost, result.aiMonthlyCost, 1);
+  // Dérivés, consommés depuis les outputs du moteur (aucun recalcul moteur).
+  const humanPerTask =
+    scenario.monthlyVolume > 0 ? result.humanMonthlyCost / scenario.monthlyVolume : 0;
+  const aiSegments = [
+    { label: "Tokens API", value: result.costPerTask.apiTokens, color: "bg-emerald-500" },
+    { label: "Vérification humaine", value: result.costPerTask.humanReview, color: "bg-amber-500" },
+    { label: "Risque d’erreur", value: result.costPerTask.errorRisk, color: "bg-rose-500" },
+  ];
+  const VerdictIcon =
+    result.recommendation === "AUTOMATISER"
+      ? Check
+      : result.recommendation === "HYBRIDE"
+        ? Minus
+        : AlertTriangle;
 
   const runEstimate = async () => {
     if (!description.trim() || estimating) return;
@@ -317,51 +334,63 @@ function Index() {
             </p>
           </div>
 
-          {estimateMeta && estimateMeta.assumptions.length > 0 && (
-            <div className={`mt-5 px-5 py-4 ${CARD} animate-in fade-in duration-500`}>
-              <p className="text-[10px] uppercase tracking-wider text-slate-400">
-                Hypothèses retenues par l’IA
-              </p>
-              <ul className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
-                {estimateMeta.assumptions.map((a, i) => (
-                  <li key={i} className="flex gap-2 text-[13px] text-slate-600">
-                    <span className="text-indigo-500">·</span>
-                    {a}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* ===================== NIVEAU 1 : verdict + levier ===================== */}
+          <section
+            ref={verdictRef}
+            className={`mt-5 p-6 ${CARD} animate-in fade-in slide-in-from-bottom-3 duration-500`}
+          >
+            <span
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-bold uppercase tracking-wide ${verdictChipClass(result.recommendation)}`}
+            >
+              <VerdictIcon className="size-4" />
+              {result.recommendation}
+            </span>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">{result.explanation}</p>
+            <p
+              className={`mt-5 text-5xl font-bold tracking-tight sm:text-6xl ${result.monthlySavings >= 0 ? "text-emerald-600" : "text-rose-600"}`}
+            >
+              {eur.format(Math.abs(result.monthlySavings))}
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {result.monthlySavings >= 0 ? "économisés par mois" : "de surcoût par mois"}
+            </p>
+            <p className="mt-4 text-xs text-slate-500">
+              Humain <span className="font-semibold text-slate-700">{eur.format(result.humanMonthlyCost)}</span>/mois
+              {" · "}IA <span className="font-semibold text-slate-700">{eur.format(result.aiMonthlyCost)}</span>/mois
+            </p>
+          </section>
 
-          <div ref={verdictRef} className="mt-6 rounded-3xl bg-white/40 p-1">
-            <Verdict result={result} />
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <Metric
-                label="Économies mensuelles"
-                value={eur.format(result.monthlySavings)}
-                source="humain moins coût IA complet"
-                positive={result.monthlySavings >= 0}
-              />
-              <Metric
-                label="Seuil de bascule"
-                value={
-                  result.breakEvenVolume === null
-                    ? "Non atteint"
-                    : `${num.format(result.breakEvenVolume)} tâches/mois`
-                }
-                source="coûts fixes ÷ marge unitaire"
-              />
-              <Metric
-                label="Part de l’API"
-                value={pct(result.apiShareOfVariableCost)}
-                source="tout le reste est humain"
-              />
+          <div className={`mt-3 px-5 py-4 ${CARD}`}>
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs font-medium text-slate-500">Coût d’un incident</span>
+              <span className="text-sm font-semibold">{eur.format(scenario.errorCostEur)}</span>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <CostBar label="Humain seul" value={result.humanMonthlyCost} max={maxCost} />
-              <CostBar label="IA tout compris" value={result.aiMonthlyCost} max={maxCost} positive />
-            </div>
+            <input
+              type="range"
+              min={0}
+              max={Math.max(500, scenario.errorCostEur)}
+              step={5}
+              value={scenario.errorCostEur}
+              onChange={(e) => setNum("errorCostEur", e.target.value)}
+              className="mt-2 w-full accent-indigo-600"
+              aria-label="Coût d’un incident"
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              {result.breakEvenVolume === null ? (
+                <>
+                  Bascule <span className="font-semibold text-rose-600">non atteinte</span> à ce niveau de risque
+                </>
+              ) : (
+                <>
+                  Bascule à{" "}
+                  <span className="font-semibold text-slate-900">
+                    {num.format(result.breakEvenVolume)} tâches/mois
+                  </span>
+                </>
+              )}
+            </p>
           </div>
+
           <button
             type="button"
             onClick={exportVerdict}
@@ -369,101 +398,28 @@ function Index() {
             className="mt-3 flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs text-slate-600 shadow-sm transition-colors hover:border-indigo-400 hover:text-indigo-700 disabled:opacity-50"
           >
             <Download className="size-3.5" />
-            {isExporting ? "Export en cours…" : "Exporter le verdict en image"}
+            {isExporting ? "Export en cours…" : "Exporter en image"}
           </button>
 
-          <Section
-            title="La partie immergée"
-            sub="Le prix de l’API n’est que la pointe de l’iceberg"
-          >
-            <div className={`space-y-4 px-5 py-5 ${CARD}`}>
-              <Break
-                label="Tokens API"
-                value={result.costPerTask.apiTokens}
-                source="tarifs officiels USD convertis en EUR"
-                color="bg-emerald-500"
-              />
-              <Break
-                label="Vérification humaine"
-                value={result.costPerTask.humanReview}
-                source="temps de relecture × coût chargé"
-                color="bg-amber-500"
-              />
-              <Break
-                label="Risque d’erreur"
-                value={result.costPerTask.errorRisk}
-                source="taux résiduel × coût d’incident"
-                color="bg-rose-500"
-              />
-            </div>
-          </Section>
+          {estimateMeta && estimateMeta.assumptions.length > 0 && (
+            <Disclosure title="Voir les hypothèses">
+              <ul className="grid gap-1.5 sm:grid-cols-2">
+                {estimateMeta.assumptions.map((a, i) => (
+                  <li key={i} className="flex gap-2 text-[13px] text-slate-600">
+                    <span className="text-indigo-500">·</span>
+                    {a}
+                  </li>
+                ))}
+              </ul>
+            </Disclosure>
+          )}
 
+          {/* ===================== NIVEAU 2 : levier visuel + bascule ===================== */}
           <Section
-            title="Cloud ou souverain ?"
-            sub="Si vous automatisez, comment déployer le modèle"
-            icon={<Shield className="size-4 text-indigo-500" />}
+            title="Coût par tâche : humain vs IA"
+            sub="Le prix des tokens n’est que la pointe de l’iceberg"
           >
-            <div className="grid gap-3 sm:grid-cols-3">
-              <DeployCard
-                label="Humain seul"
-                value={deployments.human.monthly}
-                active={deployments.cheapest === "human"}
-              />
-              <DeployCard
-                label="IA cloud (API)"
-                value={deployments.cloud.monthly}
-                active={deployments.cheapest === "cloud"}
-              />
-              <DeployCard
-                label="IA locale souveraine"
-                value={deployments.local.monthly}
-                active={deployments.cheapest === "local"}
-                badge="Vos données restent chez vous"
-              />
-            </div>
-            <div className={`mt-3 px-4 py-3 text-[13px] leading-relaxed text-slate-600 ${CARD}`}>
-              {(() => {
-                const be = deployments.localBreakEvenVsCloudVolume;
-                // Un seuil de bascule au-delà de 10x le volume (ou 100k tâches) n'a aucun
-                // sens opérationnel : les tokens sont si bon marché que le cloud reste
-                // imbattable sur le prix. On en fait un argument souveraineté.
-                const localUnrealistic =
-                  be === null || be > Math.max(scenario.monthlyVolume * 10, 100_000);
-                if (deployments.sovereigntyPremiumMonthly <= 0) {
-                  return (
-                    <>
-                      À ce volume, le souverain est{" "}
-                      <span className="font-semibold text-emerald-600">même moins cher</span> que le
-                      cloud : vos données restent chez vous sans surcoût.
-                    </>
-                  );
-                }
-                return (
-                  <>
-                    La souveraineté coûte{" "}
-                    <span className="font-semibold text-slate-900">
-                      {eur.format(deployments.sovereigntyPremiumMonthly)}/mois
-                    </span>{" "}
-                    de plus que le cloud ({pct(deployments.sovereigntyPremiumRate)}).{" "}
-                    {localUnrealistic ? (
-                      <>
-                        Ici les tokens sont si bon marché que le cloud reste imbattable sur le prix :
-                        le local se justifie par la souveraineté de vos données, pas par le coût.
-                      </>
-                    ) : (
-                      <>
-                        On chiffre le prix de la confidentialité, à vous d’arbitrer. Le local devient
-                        plus avantageux dès{" "}
-                        <span className="font-semibold text-slate-900">
-                          {num.format(be ?? 0)} tâches/mois
-                        </span>
-                        .
-                      </>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
+            <CompareBar humanPerTask={humanPerTask} segments={aiSegments} />
           </Section>
 
           <Section title="Seuil de bascule" sub="Coût mensuel selon le volume de tâches">
@@ -539,8 +495,137 @@ function Index() {
             </div>
           </Section>
 
-          <Section title="Empreinte mensuelle" icon={<Leaf className="size-4 text-emerald-500" />}>
-            <div className={`px-5 py-5 ${CARD}`}>
+          {/* ===================== NIVEAU 3 : détails repliés ===================== */}
+          <div className="mt-8">
+            <Disclosure title="Choix du modèle" icon={<Sparkles className="size-4 text-indigo-500" />}>
+              <div className="mb-4 flex items-center gap-2">
+                <span className="text-[11px] text-slate-500">Trier par</span>
+                <div className="flex overflow-hidden rounded-lg border border-slate-200">
+                  {(
+                    [
+                      ["cost", "Coût mensuel"],
+                      ["energy", "Énergie"],
+                    ] as const
+                  ).map(([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setModelSort(k)}
+                      className={`px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                        modelSort === k
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px] text-left">
+                  <thead className="text-[10px] uppercase tracking-widest text-slate-400">
+                    <tr className="border-b border-slate-200">
+                      <th className="py-3 pr-4">Modèle</th>
+                      <th className="px-3 py-3 text-right">Coût/mois</th>
+                      <th className="px-3 py-3 text-right">Économies</th>
+                      <th className="px-3 py-3 text-right">Énergie</th>
+                      <th className="py-3 pl-3 text-right">CO₂eq</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedModels.map((r, i) => (
+                      <tr key={r.model} className="border-b border-slate-100 last:border-0">
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{r.modelName}</span>
+                            {i === 0 && (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] uppercase text-emerald-700">
+                                {modelSort === "cost" ? "Optimal coût" : "Plus sobre"}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-400">{r.provider}</p>
+                        </td>
+                        <td className="px-3 py-3 text-right text-sm">{eur.format(r.aiMonthlyCost)}</td>
+                        <td
+                          className={`px-3 py-3 text-right text-sm ${r.monthlySavings >= 0 ? "text-emerald-600" : "text-rose-500"}`}
+                        >
+                          {eur.format(r.monthlySavings)}
+                        </td>
+                        <td className="px-3 py-3 text-right text-sm text-slate-500">
+                          {num.format(r.footprint.energyWh)} Wh
+                        </td>
+                        <td className="py-3 pl-3 text-right text-sm text-slate-500">
+                          {num.format(r.footprint.carbonGCo2e)} g
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-[10px] uppercase tracking-wider text-slate-400">
+                Tarifs officiels mi-2026 · énergie arXiv 2505.09598 · CO₂eq mix{" "}
+                {regionLabel(scenario.region)} · à revalider le jour J
+              </p>
+            </Disclosure>
+
+            <Disclosure title="Cloud ou souverain" icon={<Shield className="size-4 text-indigo-500" />}>
+              <DeployCard
+                label="IA locale souveraine"
+                value={deployments.local.monthly}
+                active={deployments.cheapest === "local"}
+                badge="Vos données restent chez vous"
+              />
+              <p className="mt-3 text-[11px] text-slate-500">
+                Pour comparaison : Humain{" "}
+                <span className="font-medium text-slate-700">{eur.format(deployments.human.monthly)}</span>/mois ·
+                Cloud (API){" "}
+                <span className="font-medium text-slate-700">{eur.format(deployments.cloud.monthly)}</span>/mois
+              </p>
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] leading-relaxed text-slate-600">
+                {(() => {
+                  const be = deployments.localBreakEvenVsCloudVolume;
+                  const localUnrealistic =
+                    be === null || be > Math.max(scenario.monthlyVolume * 10, 100_000);
+                  if (deployments.sovereigntyPremiumMonthly <= 0) {
+                    return (
+                      <>
+                        À ce volume, le souverain est{" "}
+                        <span className="font-semibold text-emerald-600">même moins cher</span> que le
+                        cloud : vos données restent chez vous sans surcoût.
+                      </>
+                    );
+                  }
+                  return (
+                    <>
+                      La souveraineté coûte{" "}
+                      <span className="font-semibold text-slate-900">
+                        {eur.format(deployments.sovereigntyPremiumMonthly)}/mois
+                      </span>{" "}
+                      de plus que le cloud ({pct(deployments.sovereigntyPremiumRate)}).{" "}
+                      {localUnrealistic ? (
+                        <>
+                          Ici les tokens sont si bon marché que le cloud reste imbattable sur le prix :
+                          le local se justifie par la souveraineté de vos données, pas par le coût.
+                        </>
+                      ) : (
+                        <>
+                          On chiffre le prix de la confidentialité, à vous d’arbitrer. Le local devient
+                          plus avantageux dès{" "}
+                          <span className="font-semibold text-slate-900">
+                            {num.format(be ?? 0)} tâches/mois
+                          </span>
+                          .
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </Disclosure>
+
+            <Disclosure title="Empreinte détaillée" icon={<Leaf className="size-4 text-emerald-500" />}>
               <div className="grid grid-cols-3 gap-4">
                 <Foot
                   value={`${num.format(result.footprint.energyWh)} Wh`}
@@ -571,110 +656,10 @@ function Index() {
                   qu’un faux chiffre précis.
                 </span>
               </div>
-            </div>
-          </Section>
+            </Disclosure>
 
-          <Section title="Le bon modèle pour cette tâche" sub="Classés par coût mensuel total croissant">
-            <div className={`overflow-hidden ${CARD}`}>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[680px] text-left">
-                  <thead className="text-[10px] uppercase tracking-widest text-slate-400">
-                    <tr className="border-b border-slate-200 bg-slate-50/60">
-                      <th className="px-5 py-3.5">Rang / modèle</th>
-                      <th className="px-5 py-3.5">Fournisseur</th>
-                      <th className="px-5 py-3.5 text-right">Coût mensuel IA</th>
-                      <th className="px-5 py-3.5 text-right">Économies</th>
-                      <th className="px-5 py-3.5 text-right">Énergie</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ranking.map((r, i) => (
-                      <tr key={r.model} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50">
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-slate-400">{String(i + 1).padStart(2, "0")}</span>
-                            <span className="text-sm font-medium">{r.modelName}</span>
-                            {i === 0 && (
-                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] uppercase text-emerald-700">
-                                Optimal coût
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 text-xs text-slate-500">{r.provider}</td>
-                        <td className="px-5 py-4 text-right text-sm">{eur.format(r.aiMonthlyCost)}</td>
-                        <td
-                          className={`px-5 py-4 text-right text-sm ${r.monthlySavings >= 0 ? "text-emerald-600" : "text-rose-500"}`}
-                        >
-                          {eur.format(r.monthlySavings)}
-                        </td>
-                        <td className="px-5 py-4 text-right text-sm text-slate-500">
-                          {num.format(r.footprint.energyWh)} Wh
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <p className="mt-3 text-[10px] uppercase tracking-wider text-slate-400">
-              Tarifs officiels mi-2026 · énergie arXiv 2505.09598 · à revalider le jour J
-            </p>
-          </Section>
-
-          <Section
-            title="Sobriété environnementale"
-            sub="Quel modèle consomme le moins pour le même travail"
-            icon={<Gauge className="size-4 text-emerald-500" />}
-          >
-            <div className={`divide-y divide-slate-100 ${CARD}`}>
-              {sobriety.map((s, i) => (
-                <div key={s.model} className="flex items-center gap-4 px-5 py-3.5">
-                  <span className="w-5 shrink-0 text-xs text-slate-400">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div className="w-[150px] shrink-0">
-                    <p className="text-sm font-medium">{s.modelName}</p>
-                    <p className="text-[10px] text-slate-400">{s.provider}</p>
-                  </div>
-                  <div className="flex-1">
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-700"
-                        style={{ width: `${s.sobrietyScore}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="w-9 shrink-0 text-right text-sm font-semibold text-emerald-600">
-                    {s.sobrietyScore}
-                  </span>
-                  <span className="hidden w-24 shrink-0 text-right text-xs text-slate-500 sm:block">
-                    {num.format(s.energyWhMonthly)} Wh
-                  </span>
-                  <span className="hidden w-20 shrink-0 text-right text-xs text-slate-500 sm:block">
-                    {num.format(s.carbonGCo2eMonthly)} g
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-[10px] uppercase tracking-wider text-slate-400">
-              Score 100 = le plus sobre · énergie et CO₂eq mensuels pour ce volume · mix{" "}
-              {regionLabel(scenario.region)}
-            </p>
-          </Section>
-
-          <div className={`mt-8 overflow-hidden ${CARD}`}>
-            <button
-              type="button"
-              onClick={() => setAdvancedOpen((o) => !o)}
-              className="flex w-full items-center justify-between px-5 py-4 text-sm font-medium transition-colors hover:bg-slate-50"
-            >
-              Ajuster les paramètres
-              <ChevronDown className={`size-4 text-slate-400 transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
-            </button>
-            {advancedOpen && (
-              <div className="border-t border-slate-200 px-5 py-5">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Disclosure title="Ajuster les paramètres" open={advancedOpen} onToggle={setAdvancedOpen}>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <Field label="Nom de la tâche" wide>
                     <input
                       className="field"
@@ -768,9 +753,8 @@ function Index() {
                       ))}
                     </div>
                   </Field>
-                </div>
               </div>
-            )}
+            </Disclosure>
           </div>
         </div>
       </div>
@@ -1086,82 +1070,89 @@ function Range({
     </label>
   );
 }
-function Verdict({ result }: { result: ReturnType<typeof evaluate> }) {
-  const style =
-    result.recommendation === "AUTOMATISER"
-      ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 text-emerald-700"
-      : result.recommendation === "HYBRIDE"
-        ? "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 text-amber-700"
-        : "border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50 text-rose-700";
-  const Icon =
-    result.recommendation === "AUTOMATISER"
-      ? Check
-      : result.recommendation === "HYBRIDE"
-        ? Minus
-        : AlertTriangle;
+function Disclosure({
+  title,
+  icon,
+  open: openProp,
+  onToggle,
+  children,
+}: {
+  title: string;
+  icon?: ReactNode;
+  open?: boolean;
+  onToggle?: (v: boolean) => void;
+  children: ReactNode;
+}) {
+  const [internal, setInternal] = useState(false);
+  const open = openProp ?? internal;
+  const toggle = () => (onToggle ? onToggle(!open) : setInternal((o) => !o));
   return (
-    <div className={`rounded-3xl border p-6 shadow-sm transition-colors duration-500 ${style}`}>
-      <div className="flex gap-4">
-        <Icon className="mt-1 size-6 shrink-0" />
-        <div>
-          <p className="text-3xl font-bold tracking-tight">{result.recommendation}</p>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">{result.explanation}</p>
+    <div className={`mt-4 overflow-hidden ${CARD}`}>
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-slate-50"
+      >
+        <span className="flex items-center gap-2">
+          {icon}
+          <span className="text-sm font-semibold text-slate-900">{title}</span>
+        </span>
+        <ChevronDown
+          className={`size-4 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && <div className="border-t border-slate-200 px-5 py-5">{children}</div>}
+    </div>
+  );
+}
+function CompareBar({
+  humanPerTask,
+  segments,
+}: {
+  humanPerTask: number;
+  segments: { label: string; value: number; color: string }[];
+}) {
+  const aiTotal = segments.reduce((acc, s) => acc + s.value, 0);
+  const max = Math.max(humanPerTask, aiTotal, 1e-9);
+  return (
+    <div className={`px-5 py-5 ${CARD}`}>
+      <div>
+        <div className="flex justify-between text-xs">
+          <span className="text-slate-600">Humain</span>
+          <span className="font-medium">{eurFine.format(humanPerTask)} / tâche</span>
+        </div>
+        <div className="mt-1.5 h-5 overflow-hidden rounded-lg bg-slate-100">
+          <div
+            className="h-full rounded-lg bg-slate-300 transition-all duration-700"
+            style={{ width: `${(humanPerTask / max) * 100}%` }}
+          />
         </div>
       </div>
-    </div>
-  );
-}
-function CostBar({
-  label,
-  value,
-  max,
-  positive,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  positive?: boolean;
-}) {
-  return (
-    <div className={`p-5 ${CARD}`}>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{eur.format(value)}</p>
-      <div className="mt-4 flex h-12 items-end overflow-hidden rounded-lg bg-slate-100">
-        <div
-          className={`w-full rounded-t-lg transition-all duration-700 ease-out ${positive ? "bg-gradient-to-t from-blue-600 to-indigo-500" : "bg-slate-300"}`}
-          style={{ height: `${Math.max(8, (value / max) * 100)}%` }}
-        />
+      <div className="mt-4">
+        <div className="flex justify-between text-xs">
+          <span className="text-slate-600">IA tout compris</span>
+          <span className="font-medium">{eurFine.format(aiTotal)} / tâche</span>
+        </div>
+        <div className="mt-1.5 flex h-5 overflow-hidden rounded-lg bg-slate-100">
+          {segments.map((s) => (
+            <div
+              key={s.label}
+              className={`h-full ${s.color} transition-all duration-700`}
+              style={{ width: `${(s.value / max) * 100}%`, minWidth: s.value > 0 ? "2px" : 0 }}
+              title={`${s.label} : ${eurFine.format(s.value)}`}
+            />
+          ))}
+        </div>
       </div>
-      <p className="mt-2 text-[9px] text-slate-400">
-        {positive ? "API + contrôle + risque + fixe" : "coût horaire chargé × temps"}
-      </p>
-    </div>
-  );
-}
-function Break({
-  label,
-  value,
-  source,
-  color,
-}: {
-  label: string;
-  value: number;
-  source: string;
-  color: string;
-}) {
-  return (
-    <div>
-      <div className="flex justify-between">
-        <span className="text-xs text-slate-600">{label}</span>
-        <span className="text-sm font-medium">{eurFine.format(value)}</span>
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5">
+        {segments.map((s) => (
+          <span key={s.label} className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span className={`size-2.5 rounded-sm ${s.color}`} />
+            {s.label}
+            <span className="font-medium text-slate-700">{eurFine.format(s.value)}</span>
+          </span>
+        ))}
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${color}`}
-          style={{ width: `${Math.max(2, Math.min(100, value * 40))}%` }}
-        />
-      </div>
-      <p className="mt-1.5 text-[9px] text-slate-400">{source}</p>
     </div>
   );
 }
