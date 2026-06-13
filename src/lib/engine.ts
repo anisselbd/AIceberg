@@ -129,55 +129,59 @@ interface ModelFactors {
   energyWhPerThousandTokens: number;
 }
 
-// Valeurs temporaires : remplacez ce registre par vos tarifs et facteurs sourcés.
+// Tarifs relevés mi-2026, convertis en EUR depuis les grilles officielles en USD
+// (taux 1 USD = 0,92 EUR). Sources : Anthropic pricing (2026-06-04), openai.com/api/pricing,
+// ai.google.dev/pricing, mistral.ai/pricing. À revalider le jour J, les prix bougent.
+// Énergie : Wh / 1000 tokens, calée sur arXiv:2505.09598 "How Hungry is AI?" (mai 2025)
+// et 0,34 Wh/requête moyenne (OpenAI, 2025). Classes : nano ~0,5, small ~1, mid ~1,8, large ~3.
 export const MODEL_FACTORS: Record<ModelId, ModelFactors> = {
   "claude-opus-4-8": {
     id: "claude-opus-4-8",
     name: "Claude Opus 4.8",
     provider: "Anthropic",
-    inputEurPerMillionTokens: 15,
-    outputEurPerMillionTokens: 75,
-    energyWhPerThousandTokens: 4.8,
+    inputEurPerMillionTokens: 4.6, // 5 USD
+    outputEurPerMillionTokens: 23, // 25 USD
+    energyWhPerThousandTokens: 3.0,
   },
   "claude-sonnet-4-6": {
     id: "claude-sonnet-4-6",
     name: "Claude Sonnet 4.6",
     provider: "Anthropic",
-    inputEurPerMillionTokens: 3,
-    outputEurPerMillionTokens: 15,
-    energyWhPerThousandTokens: 2.1,
+    inputEurPerMillionTokens: 2.76, // 3 USD
+    outputEurPerMillionTokens: 13.8, // 15 USD
+    energyWhPerThousandTokens: 1.8,
   },
   "claude-haiku-4-5": {
     id: "claude-haiku-4-5",
     name: "Claude Haiku 4.5",
     provider: "Anthropic",
-    inputEurPerMillionTokens: 0.8,
-    outputEurPerMillionTokens: 4,
-    energyWhPerThousandTokens: 0.8,
+    inputEurPerMillionTokens: 0.92, // 1 USD
+    outputEurPerMillionTokens: 4.6, // 5 USD
+    energyWhPerThousandTokens: 1.0,
   },
   "gpt-5-4": {
     id: "gpt-5-4",
     name: "GPT-5.4",
     provider: "OpenAI",
-    inputEurPerMillionTokens: 2.5,
-    outputEurPerMillionTokens: 10,
-    energyWhPerThousandTokens: 2.4,
+    inputEurPerMillionTokens: 2.3, // 2,5 USD
+    outputEurPerMillionTokens: 13.8, // 15 USD
+    energyWhPerThousandTokens: 1.8,
   },
   "gemini-2-5-flash-lite": {
     id: "gemini-2-5-flash-lite",
     name: "Gemini 2.5 Flash-Lite",
     provider: "Google",
-    inputEurPerMillionTokens: 0.1,
-    outputEurPerMillionTokens: 0.4,
-    energyWhPerThousandTokens: 0.35,
+    inputEurPerMillionTokens: 0.092, // 0,1 USD
+    outputEurPerMillionTokens: 0.368, // 0,4 USD
+    energyWhPerThousandTokens: 0.5,
   },
   "mistral-small": {
     id: "mistral-small",
     name: "Mistral Small",
     provider: "Mistral AI",
-    inputEurPerMillionTokens: 0.2,
-    outputEurPerMillionTokens: 0.6,
-    energyWhPerThousandTokens: 0.55,
+    inputEurPerMillionTokens: 0.184, // 0,2 USD
+    outputEurPerMillionTokens: 0.552, // 0,6 USD
+    energyWhPerThousandTokens: 1.0,
   },
   other: {
     id: "other",
@@ -187,6 +191,15 @@ export const MODEL_FACTORS: Record<ModelId, ModelFactors> = {
     outputEurPerMillionTokens: 3,
     energyWhPerThousandTokens: 1.2,
   },
+};
+
+// Intensité carbone du mix électrique, gCO2eq par Wh (= g/kWh divisé par 1000).
+// Sources : RTE eco2mix / Ember 2024. France 56, UE 250, USA 369, Monde 480 g/kWh.
+const CARBON_G_PER_WH: Record<Region, number> = {
+  france: 0.056,
+  eu: 0.25,
+  usa: 0.369,
+  world: 0.48,
 };
 
 const safe = (value: number) => Math.max(0, Number.isFinite(value) ? value : 0);
@@ -231,6 +244,9 @@ export function evaluate(scenario: Scenario): EvaluationResult {
   const totalTokensThousands =
     (safe(scenario.inputTokensPerTask) + safe(scenario.outputTokensPerTask)) / 1_000;
   const energyWh = volume * totalTokensThousands * model.energyWhPerThousandTokens;
+  // Eau : facteur WUE. On-site ~1,7 mL/Wh (Li et al., arXiv:2304.03271 "Making AI Less Thirsty").
+  // Périmètre étendu (production d'électricité incluse) bien supérieur : la littérature va
+  // jusqu'à ~519 mL pour une réponse de 100 mots (UC Riverside). 45 mL/Wh comme ordre de grandeur.
   const waterMlOnSite = energyWh * 1.7;
   const waterMlLifeCycle = energyWh * 45;
   const waterMl = scenario.waterScope === "life-cycle" ? waterMlLifeCycle : waterMlOnSite;
@@ -250,7 +266,7 @@ export function evaluate(scenario: Scenario): EvaluationResult {
       waterMl,
       waterMlOnSite,
       waterMlLifeCycle,
-      carbonGCo2e: energyWh * 0.42,
+      carbonGCo2e: energyWh * CARBON_G_PER_WH[scenario.region],
     },
   };
 }
