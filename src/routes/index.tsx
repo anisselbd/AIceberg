@@ -608,9 +608,19 @@ function Metric({
     </div>
   );
 }
-function Foot({ value, label, source }: { value: string; label: string; source: string }) {
+function Foot({
+  value,
+  label,
+  source,
+  highlight,
+}: {
+  value: string;
+  label: string;
+  source: string;
+  highlight?: boolean;
+}) {
   return (
-    <div className="border-l border-border pl-3">
+    <div className={`border-l border-border pl-3 ${highlight ? "border-l-primary" : ""}`}>
       <p className="font-mono text-sm sm:text-base">{value}</p>
       <p className="mt-1 text-[10px] text-muted-foreground">{label}</p>
       <p className="mt-1 text-[8px] text-muted-foreground/70">{source}</p>
