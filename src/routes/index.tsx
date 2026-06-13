@@ -338,7 +338,8 @@ function Index() {
               <Foot
                 value={`${num.format(result.footprint.waterMl)} mL`}
                 label="Eau"
-                source="facteur datacenter"
+                source={`${scenario.waterScope === "life-cycle" ? "Cycle de vie" : "On-site"} · facteur ${scenario.waterScope === "life-cycle" ? "45" : "1,7"} mL/Wh`}
+                highlight
               />
               <Foot
                 value={`${num.format(result.footprint.carbonGCo2e)} g`}
@@ -346,9 +347,17 @@ function Index() {
                 source="mix électrique régional"
               />
             </div>
-            <p className="mt-3 text-[10px] text-muted-foreground">
-              Estimations sourcées, fourchettes assumées · facteurs temporaires
-            </p>
+            <div className="mt-3 flex items-start gap-2 rounded-sm border border-border bg-panel px-3 py-2">
+              <span className="mt-0.5 text-[10px] text-muted-foreground">Fourchette eau :</span>
+              <span className="font-mono text-[10px]">
+                {num.format(result.footprint.waterMlOnSite)} – {num.format(result.footprint.waterMlLifeCycle)} mL
+              </span>
+              <span className="ml-auto max-w-[60%] text-[10px] leading-tight text-muted-foreground">
+                L’écart reflète le périmètre comptabilisé : refroidissement direct du datacenter (on-site)
+                versus fabrication des puces, construction de l’infrastructure et cycle de vie complet (life-cycle).
+                Les études sur ce sujet varient d’un facteur 10 à 50.
+              </span>
+            </div>
           </div>
         </section>
       </div>
