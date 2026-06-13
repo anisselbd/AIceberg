@@ -78,10 +78,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Bascule — Décider d’automatiser avec l’IA" },
-      { name: "description", content: "Évaluez le coût complet, le risque et l’impact d’une automatisation IA pour votre PME." },
+      {
+        name: "description",
+        content:
+          "Évaluez le coût complet, le risque et l’impact d’une automatisation IA pour votre PME.",
+      },
       { name: "author", content: "Bascule" },
       { property: "og:title", content: "Bascule — Décider d’automatiser avec l’IA" },
-      { property: "og:description", content: "Un outil financier pour arbitrer entre traitement humain, hybride et automatisation IA." },
+      {
+        property: "og:description",
+        content:
+          "Un outil financier pour arbitrer entre traitement humain, hybride et automatisation IA.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

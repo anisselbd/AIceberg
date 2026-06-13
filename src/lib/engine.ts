@@ -70,13 +70,62 @@ interface ModelFactors {
 
 // Valeurs temporaires : remplacez ce registre par vos tarifs et facteurs sourcés.
 export const MODEL_FACTORS: Record<ModelId, ModelFactors> = {
-  "claude-opus-4-8": { id: "claude-opus-4-8", name: "Claude Opus 4.8", provider: "Anthropic", inputEurPerMillionTokens: 15, outputEurPerMillionTokens: 75, energyWhPerThousandTokens: 4.8 },
-  "claude-sonnet-4-6": { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", provider: "Anthropic", inputEurPerMillionTokens: 3, outputEurPerMillionTokens: 15, energyWhPerThousandTokens: 2.1 },
-  "claude-haiku-4-5": { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", provider: "Anthropic", inputEurPerMillionTokens: 0.8, outputEurPerMillionTokens: 4, energyWhPerThousandTokens: 0.8 },
-  "gpt-5-4": { id: "gpt-5-4", name: "GPT-5.4", provider: "OpenAI", inputEurPerMillionTokens: 2.5, outputEurPerMillionTokens: 10, energyWhPerThousandTokens: 2.4 },
-  "gemini-2-5-flash-lite": { id: "gemini-2-5-flash-lite", name: "Gemini 2.5 Flash-Lite", provider: "Google", inputEurPerMillionTokens: 0.1, outputEurPerMillionTokens: 0.4, energyWhPerThousandTokens: 0.35 },
-  "mistral-small": { id: "mistral-small", name: "Mistral Small", provider: "Mistral AI", inputEurPerMillionTokens: 0.2, outputEurPerMillionTokens: 0.6, energyWhPerThousandTokens: 0.55 },
-  other: { id: "other", name: "Autre modèle", provider: "Autre", inputEurPerMillionTokens: 1, outputEurPerMillionTokens: 3, energyWhPerThousandTokens: 1.2 },
+  "claude-opus-4-8": {
+    id: "claude-opus-4-8",
+    name: "Claude Opus 4.8",
+    provider: "Anthropic",
+    inputEurPerMillionTokens: 15,
+    outputEurPerMillionTokens: 75,
+    energyWhPerThousandTokens: 4.8,
+  },
+  "claude-sonnet-4-6": {
+    id: "claude-sonnet-4-6",
+    name: "Claude Sonnet 4.6",
+    provider: "Anthropic",
+    inputEurPerMillionTokens: 3,
+    outputEurPerMillionTokens: 15,
+    energyWhPerThousandTokens: 2.1,
+  },
+  "claude-haiku-4-5": {
+    id: "claude-haiku-4-5",
+    name: "Claude Haiku 4.5",
+    provider: "Anthropic",
+    inputEurPerMillionTokens: 0.8,
+    outputEurPerMillionTokens: 4,
+    energyWhPerThousandTokens: 0.8,
+  },
+  "gpt-5-4": {
+    id: "gpt-5-4",
+    name: "GPT-5.4",
+    provider: "OpenAI",
+    inputEurPerMillionTokens: 2.5,
+    outputEurPerMillionTokens: 10,
+    energyWhPerThousandTokens: 2.4,
+  },
+  "gemini-2-5-flash-lite": {
+    id: "gemini-2-5-flash-lite",
+    name: "Gemini 2.5 Flash-Lite",
+    provider: "Google",
+    inputEurPerMillionTokens: 0.1,
+    outputEurPerMillionTokens: 0.4,
+    energyWhPerThousandTokens: 0.35,
+  },
+  "mistral-small": {
+    id: "mistral-small",
+    name: "Mistral Small",
+    provider: "Mistral AI",
+    inputEurPerMillionTokens: 0.2,
+    outputEurPerMillionTokens: 0.6,
+    energyWhPerThousandTokens: 0.55,
+  },
+  other: {
+    id: "other",
+    name: "Autre modèle",
+    provider: "Autre",
+    inputEurPerMillionTokens: 1,
+    outputEurPerMillionTokens: 3,
+    energyWhPerThousandTokens: 1.2,
+  },
 };
 
 const safe = (value: number) => Math.max(0, Number.isFinite(value) ? value : 0);
@@ -110,10 +159,12 @@ export function evaluate(scenario: Scenario): EvaluationResult {
   let explanation = "Le coût complet de l’IA dépasse encore celui du traitement humain.";
   if (monthlySavings > 0 && (reviewRate >= 0.55 || errorRate > 0.03 || savingsRate < 0.2)) {
     recommendation = "HYBRIDE";
-    explanation = "Le gain existe, mais la supervision humaine reste structurante dans l’économie du process.";
+    explanation =
+      "Le gain existe, mais la supervision humaine reste structurante dans l’économie du process.";
   } else if (monthlySavings > 0) {
     recommendation = "AUTOMATISER";
-    explanation = "Le volume absorbe les coûts fixes et dégage une économie robuste, risque inclus.";
+    explanation =
+      "Le volume absorbe les coûts fixes et dégage une économie robuste, risque inclus.";
   }
 
   const totalTokensThousands =
