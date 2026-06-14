@@ -1927,6 +1927,43 @@ function LandingShowcase({ onCTA }: { onCTA: () => void }) {
           </button>
         </div>
       </section>
+
+      <footer className="relative border-t border-white/10 bg-slate-950/30 px-4 py-12 backdrop-blur-sm sm:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <img src="/logo-aiceberg.png" alt="AIceberg" className="size-7" />
+              <span className="text-base tracking-tight">
+                <span className="font-extrabold text-sky-300">AI</span>
+                <span className="font-semibold">ceberg</span>
+              </span>
+            </div>
+            <p className="mt-3 max-w-xs text-xs leading-relaxed text-white/55">
+              Le vrai coût de l’automatisation, chiffré et sourcé. Humain, cloud ou IA locale
+              souveraine : on vous aide à trancher.
+            </p>
+          </div>
+          <nav className="flex flex-wrap items-center gap-x-8 gap-y-3 text-xs text-white/65">
+            <a
+              href="https://github.com/anisselbd/ia-evaluator"
+              target="_blank"
+              rel="noreferrer"
+              className="transition-colors hover:text-white"
+            >
+              GitHub
+            </a>
+            <button type="button" onClick={onCTA} className="transition-colors hover:text-white">
+              Lancer une analyse
+            </button>
+            <span className="text-white/45">Vibe Coding Arena · EuraTechnologies · juin 2026</span>
+          </nav>
+        </div>
+        <div className="mx-auto mt-10 max-w-6xl border-t border-white/5 pt-6 text-[11px] leading-relaxed text-white/40">
+          Tarifs et facteurs sourcés (grilles officielles des fournisseurs, arXiv 2505.09598 pour
+          l’énergie, RTE / Ember pour le carbone), affichés avec leurs fourchettes d’incertitude et à
+          revalider le jour J. © 2026 AIceberg.
+        </div>
+      </footer>
     </div>
   );
 }
