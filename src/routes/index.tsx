@@ -1448,7 +1448,7 @@ function LandingHero({
               />
               <div className="flex items-center justify-between gap-2 px-2 pb-1">
                 <span className="text-[11px] text-white/60">
-                  Estimé par Claude Haiku · quelques centièmes de centime
+                  Analyse propulsée par Claude Haiku, pour une fraction de centime
                 </span>
                 <button
                   type="button"
